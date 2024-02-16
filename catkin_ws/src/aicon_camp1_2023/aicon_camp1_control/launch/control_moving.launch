@@ -1,0 +1,4 @@
+<launch>
+  <node pkg="aicon_camp1_control" type="control_moving" name="control_moving" output="screen">
+  </node>
+</launch>

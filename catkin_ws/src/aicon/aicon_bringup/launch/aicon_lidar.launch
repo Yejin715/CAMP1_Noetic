@@ -1,0 +1,35 @@
+<launch>
+  <arg name="set_frame_id" default="base_scan"/>
+  <arg name="lidar_model" default="$(env LIDAR_MODEL)" doc="LIDAR MODEL [LDS-01, LDS-02, YDLIDAR]"/>
+
+  <group if = "$(eval lidar_model == 'LDS-01')">
+    <node pkg="hls_lfcd_lds_driver" type="hlds_laser_publisher" name="turtlebot3_lds" output="screen">
+      <param name="port" value="/dev/ttyUSB0"/>
+      <param name="frame_id" value="$(arg set_frame_id)"/>
+    </node>
+  </group>
+  <group if = "$(eval lidar_model == 'LDS-02')">
+    <node pkg="ld08_driver" type="ld08_driver" name="turtlebot3_lds" output="screen" args="LD08">
+      <param name="frame_id" value="$(arg set_frame_id)"/>
+    </node>
+  </group>
+  <group if = "$(eval lidar_model == 'YDLIDAR')">
+    <node name="ydlidar_node"  pkg="ydlidar"  type="ydlidar_node" output="screen" respawn="false" >
+      <param name="port"         type="string" value="/dev/ttyUSB0"/>  
+      <param name="baudrate"     type="int"    value="128000"/>
+      <param name="frame_id"     type="string" value="base_scan"/>
+      <param name="resolution_fixed"    type="bool"   value="true"/>
+      <param name="auto_reconnect"    type="bool"   value="true"/>
+      <param name="reversion"    type="bool"   value="false"/>
+      <param name="angle_min"    type="double" value="-180" />
+      <param name="angle_max"    type="double" value="180" />
+      <param name="range_min"    type="double" value="0.1" />
+      <param name="range_max"    type="double" value="10.0" />
+      <param name="ignore_array" type="string" value="" />
+      <param name="frequency"    type="double" value="8"/>
+      <param name="samp_rate"    type="int"    value="5"/>
+    </node>
+    <node pkg="tf" type="static_transform_publisher" name="base_link_to_laser4"
+    args="0.2245 0.0 0.2 0.0 0.0  0.0 /base_footprint /base_scan 40" />
+  </group>
+</launch>

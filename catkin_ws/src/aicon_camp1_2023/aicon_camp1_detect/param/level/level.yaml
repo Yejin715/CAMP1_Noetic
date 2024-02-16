@@ -1,0 +1,9 @@
+detect:
+  level:
+    red:
+      hue_l: 0
+      hue_h: 20
+      saturation_l: 40
+      saturation_h: 255
+      lightness_l: 30
+      lightness_h: 150

@@ -1,0 +1,91 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import rospy
+import numpy as np
+from enum import Enum
+from std_msgs.msg import Float64, UInt8
+from geometry_msgs.msg import Twist
+
+class ControlLane():
+    def __init__(self):
+        self.sub_lane = rospy.Subscriber('/detect/lane', Float64, self.cbFollowLane, queue_size = 1)
+        self.sub_max_vel = rospy.Subscriber('/max_vel', Float64, self.cbGetMaxVel, queue_size = 1)
+
+        self.pub_cmd_vel = rospy.Publisher('/cmd_vel', Twist, queue_size = 1)
+
+        # self.sub_traffic_sign = rospy.Subscriber('/detect/traffic_sign', UInt8, self.cbInvokedByTrafficSign, queue_size=1)
+
+        self.sub_mode_control = rospy.Subscriber('/core/decided_mode', UInt8, self.cbReceiveMode, queue_size=1)
+
+        self.CurrentMode = Enum('CurrentMode', 'idle lane_following traffic_light level_crossing intersection obstacle')
+
+        self.lastError = 0
+        self.MAX_VEL = 0.04 #0.13
+
+        self.current_mode = 0
+
+        #self.lane_following_flag = False
+        self.lane_following_flag = True
+
+        rospy.on_shutdown(self.fnShutDown)
+
+    def cbGetMaxVel(self, max_vel_msg):
+        self.MAX_VEL = max_vel_msg.data
+
+    def cbFollowLane(self, desired_center):
+
+        if self.lane_following_flag:
+            center = desired_center.data
+        
+            error = 500 - center
+
+            Kp = 0.002
+            Kd = 0.005
+
+            angular_z = Kp * error + Kd * (error - self.lastError)
+            self.lastError = error
+
+            twist = Twist()
+            twist.linear.x = max( self.MAX_VEL - 0.05 * (angular_z **2 / 6.25), 0.03)
+            # twist.linear.x = min(self.MAX_VEL * ((1 - abs(error) / 500) ** 1), self.MAX_VEL)    
+            twist.linear.y = 0
+            twist.linear.z = 0
+            twist.angular.x = 0
+            twist.angular.y = 0
+            twist.angular.z = angular_z
+
+            self.pub_cmd_vel.publish(twist)
+
+    def fnShutDown(self):
+        rospy.loginfo("Shutting down. cmd_vel will be 0")
+
+        twist = Twist()
+        twist.linear.x = 0
+        twist.linear.y = 0
+        twist.linear.z = 0
+        twist.angular.x = 0
+        twist.angular.y = 0
+        twist.angular.z = 0
+        self.pub_cmd_vel.publish(twist) 
+
+    # def cbInvokedByTrafficSign(self, traffic_sign_type_msg):
+    #     # pass
+    #     if (not traffic_sign_type_msg.data or traffic_sign_type_msg.data == 2 or traffic_sign_type_msg.data == 7 or traffic_sign_type_msg.data == 8) and ((self.current_mode != self.CurrentMode.obstacle.value) and (self.current_mode != self.CurrentMode.intersection.value) and (self.current_mode != self.CurrentMode.crosswalk.value)):
+    #         self.lane_following_flag = True
+    #     else:
+    #         self.lane_following_flag = False
+
+    def cbReceiveMode(self, mode_msg):
+        # rospy.loginfo("starts the progress with %d", mode_msg.data)
+        
+        self.current_mode = mode_msg.data
+        
+
+    def main(self):
+        rospy.spin()
+
+if __name__ == '__main__':
+    rospy.init_node('control_lane')
+    node = ControlLane()
+    node.main()

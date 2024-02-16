@@ -1,0 +1,9 @@
+<launch>
+
+  <!-- <include file="$(find aicon_camp1_camera)/launch/camera_publish.launch">
+  </include> -->
+  <include file="$(find aicon_camp1_camera)/launch/intrinsic_camera_calibration.launch">
+  </include>
+  <include file="$(find aicon_camp1_camera)/launch/extrinsic_camera_calibration.launch">
+  </include>
+</launch>

@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>aicon_camp1_control</name>
+  <version>1.0.0</version>
+  <description>
+    Aicontrol CAMP-1 2023 ROS 1 packages that Auto's control
+  </description>
+  <license>Apache 2.0</license>
+  <maintainer email="yjchoi@aicontrol.ai">Yejin Choi</maintainer>
+  <url type="website">http://aicontrol.ai</url>
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>aicon_camp1_msgs</depend>
+  <exec_depend>rospy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>python-numpy</exec_depend>
+  <exec_depend>python-enum34</exec_depend>
+</package>
+

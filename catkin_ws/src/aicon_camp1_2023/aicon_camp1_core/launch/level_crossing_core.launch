@@ -1,0 +1,5 @@
+<launch>
+    <!-- image brightness & contrast compensation of ground-projected image -->
+    <node pkg="aicon_camp1_core" type="level_crossing_node_controller" name="level_crossing_node_controller" output="screen" />
+    <node pkg="aicon_camp1_core" type="level_crossing_mode_decider" name="level_crossing_mode_decider" output="screen" />
+</launch>

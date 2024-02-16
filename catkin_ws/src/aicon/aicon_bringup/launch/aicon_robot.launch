@@ -1,0 +1,13 @@
+<launch>
+  <arg name="multi_robot_name" default=""/>
+  <arg name="set_lidar_frame_id" default="base_scan"/>
+
+  <include file="$(find aicon_bringup)/launch/aicon_core.launch">
+    <arg name="multi_robot_name" value="$(arg multi_robot_name)"/>
+  </include>
+  <include file="$(find aicon_bringup)/launch/aicon_lidar.launch">
+    <arg name="set_frame_id" value="$(arg set_lidar_frame_id)"/>
+  </include>
+
+  <node pkg="aicon_bringup" type="aicon_diagnostics" name="aicon_diagnostics" output="screen"/>
+</launch>

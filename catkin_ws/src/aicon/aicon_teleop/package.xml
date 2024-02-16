@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>aicon_teleop</name>
+  <version>1.0.0</version>
+  <description>
+    Provides teleoperation using keyboard for Aicontrol CAMP-1.
+  </description>
+  <license>BSD</license>
+  <maintainer email="yjchoi@aicontrol.ai">Yejin Choi</maintainer>
+  <url type="website">http://aicontrol.ai</url>
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>rospy</depend>
+  <depend>geometry_msgs</depend>
+</package>

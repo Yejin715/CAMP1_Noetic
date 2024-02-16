@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>aicon_camp1_msgs</name>
+  <version>1.0.0</version>
+  <description>
+    Aicontrol CAMP-1 2023 ROS 1 packages that Auto's msgs
+  </description>
+  <license>Apache 2.0</license>
+  <maintainer email="yjchoi@aicontrol.ai">Yejin Choi</maintainer>
+  <url type="website">http://aicontrol.ai</url>
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>std_msgs</depend>
+  <build_depend>message_generation</build_depend>
+  <build_export_depend>message_runtime</build_export_depend>
+  <exec_depend>message_runtime</exec_depend>
+</package>

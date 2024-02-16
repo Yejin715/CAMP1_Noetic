@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>aicon</name>
+  <version>1.0.0</version>
+  <description>
+    Aicontrol ROS packages (meta package)
+  </description>
+  <license>Apache 2.0</license>
+  <license>BSD</license>
+  <maintainer email="yjchoi@aicontrol.ai">Yejin Choi</maintainer>
+  <url type="website">http://aicontrol.ai</url>
+  <buildtool_depend>catkin</buildtool_depend>
+  <exec_depend>aicon_bringup</exec_depend>
+  <exec_depend>aicon_teleop</exec_depend>
+  <export><metapackage/></export>
+</package>

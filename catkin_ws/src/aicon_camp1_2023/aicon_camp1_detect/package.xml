@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>aicon_camp1_detect</name>
+  <version>1.0.0</version>
+  <description>
+    Aicontrol CAMP-1 2023 ROS 1 packages that for feature detection
+  </description>
+  <license>Apache 2.0</license>
+  <maintainer email="yjchoi@aicontrol.ai">Yejin Choi</maintainer>
+  <url type="website">http://aicontrol.ai</url>
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>dynamic_reconfigure</depend>
+  <exec_depend>rospy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>move_base_msgs</exec_depend>
+  <exec_depend>tf</exec_depend>
+  <exec_depend>cv_bridge</exec_depend>
+  <exec_depend>python-opencv</exec_depend>
+  <exec_depend>python-numpy</exec_depend>
+  <exec_depend>python-enum34</exec_depend>
+</package>
+

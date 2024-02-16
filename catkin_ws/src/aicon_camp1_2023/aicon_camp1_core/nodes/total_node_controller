@@ -1,0 +1,483 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import rospy, roslaunch
+import numpy as np
+import subprocess
+import os
+import sys
+from enum import Enum
+from std_msgs.msg import UInt8, Float64
+ 
+class CoreNodeController():
+    def __init__(self):
+        self.ros_package_path = os.path.dirname(os.path.realpath(__file__))
+        self.ros_package_path = self.ros_package_path.replace('aicon_camp1_core/nodes', '')
+
+        self.sub_mode_control = rospy.Subscriber('/core/decided_mode', UInt8, self.cbReceiveMode, queue_size=1)
+
+        # subscribes : status returned
+        self.sub_level_crossing_stamped = rospy.Subscriber('/detect/level_crossing_stamped', UInt8, self.cbLevelCrossingStamped, queue_size=1)
+        self.sub_intersection_stamped = rospy.Subscriber('/detect/intersection_stamped', UInt8, self.cbIntersectionStamped, queue_size=1)
+        self.sub_construction_stamped = rospy.Subscriber('/detect/construction_stamped', UInt8, self.cbconstructionStamped, queue_size=1)
+
+        # publishes orders
+        self.pub_level_crossing_order = rospy.Publisher('/detect/level_crossing_order', UInt8, queue_size=1)
+        self.pub_intersection_order = rospy.Publisher('/detect/intersection_order', UInt8, queue_size=1)
+        self.pub_construction_order = rospy.Publisher('/detect/construction_order', UInt8, queue_size=1)
+
+        self.pub_mode_return = rospy.Publisher('/core/returned_mode', UInt8, queue_size=1)
+
+        self.CurrentMode = Enum('CurrentMode', 'idle lane_following traffic_light level_crossing intersection construction')
+        self.current_mode = self.CurrentMode.lane_following.value
+
+        self.StepOfLevelCrossing = Enum('StepOfLevelCrossing', 'searching_stop_sign searching_level watching_level stop pass_level')
+        self.current_step_level_crossing = self.StepOfLevelCrossing.searching_stop_sign.value
+        self.StepOfIntersection = Enum('StepOfIntersection', 'detect_intersection_sign exit')
+        self.current_step_intersection = self.StepOfIntersection.detect_intersection_sign.value
+        self.StepOfConstruction = Enum('StepOfConstruction', 'searching_construction_sign find_obstacle motion_lf exit')
+        self.current_step_construction = self.StepOfConstruction.searching_construction_sign.value
+
+
+        self.Launcher = Enum('Launcher', 'launch_detect_sign launch_detect_lane launch_control_lane launch_detect_traffic_light launch_detect_level launch_control_intersection launch_detect_construction launch_control_moving')
+
+        self.uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
+        
+        self.launch_detect_sign_launched = False
+        self.launch_detect_lane_launched = False
+        self.launch_detect_traffic_light_launched = False
+        self.launch_control_lane_launched = False
+        self.launch_detect_level_launched = False
+        self.launch_control_intersection_launched = False
+        self.launch_detect_construction_launched = False
+        self.launch_control_moving_launched = False
+
+        self.is_triggered = False
+
+        loop_rate = rospy.Rate(10) # 10hz
+        while not rospy.is_shutdown():
+            if self.is_triggered == True:
+                self.fnControlNode()
+            
+            loop_rate.sleep()
+
+    def cbReceiveMode(self, mode_msg):
+        rospy.loginfo("starts the progress with %d", mode_msg.data)
+        
+        self.current_mode = mode_msg.data
+        self.is_triggered = True
+
+    # Which step is in Level Crossing  
+    def cbLevelCrossingStamped(self, level_crossing_msg):
+        rospy.loginfo("LevelCrossing Step changed from %d", self.current_step_level_crossing)
+
+        self.current_step_level_crossing = level_crossing_msg.data
+
+        if self.current_step_level_crossing == self.StepOfLevelCrossing.pass_level.value:
+            self.current_mode = self.CurrentMode.level_crossing.value
+            msg_mode_return = UInt8()
+            msg_mode_return.data = self.current_mode
+            self.current_step_level_crossing = self.StepOfLevelCrossing.searching_stop_sign.value
+            self.pub_mode_return.publish(msg_mode_return)
+
+        self.is_triggered = True
+
+    # Which step is in Intersection  
+    def cbIntersectionStamped(self, intersection_msg):
+        rospy.loginfo("intersection Step changed from %d", self.current_step_intersection)
+
+        self.current_step_intersection = intersection_msg.data
+
+        if self.current_step_intersection == self.StepOfIntersection.exit.value:
+            self.current_mode = self.CurrentMode.lane_following.value
+            msg_mode_return = UInt8()
+            msg_mode_return.data = self.current_mode
+            self.current_step_intersection = self.StepOfIntersection.detect_intersection_sign.value
+            self.pub_mode_return.publish(msg_mode_return)
+
+        self.is_triggered = True
+
+    # Which step is in Construction  
+    def cbconstructionStamped(self, construction_msg):
+        rospy.loginfo("construction Step changed from %d", self.current_step_construction)
+
+        self.current_step_construction = construction_msg.data
+        
+        if self.current_step_construction == self.StepOfConstruction.motion_lf.value:
+            self.current_mode = self.CurrentMode.lane_following.value
+            msg_mode_return = UInt8()
+            msg_mode_return.data = self.current_mode
+            self.current_step_construction = self.StepOfConstruction.searching_construction_sign.value
+            self.pub_mode_return.publish(msg_mode_return)
+
+        self.is_triggered = True
+
+    def fnControlNode(self): 
+        # lane_following
+        if self.current_mode == self.CurrentMode.lane_following.value:
+            rospy.loginfo("New trigger for lane_following")
+
+            self.fnLaunch(self.Launcher.launch_detect_lane.value, True)
+            self.fnLaunch(self.Launcher.launch_detect_sign.value, True)
+            self.fnLaunch(self.Launcher.launch_detect_level.value, False)
+            self.fnLaunch(self.Launcher.launch_detect_traffic_light.value, True)
+            self.fnLaunch(self.Launcher.launch_detect_construction.value, False)
+            
+            self.fnLaunch(self.Launcher.launch_control_intersection.value, False)
+            self.fnLaunch(self.Launcher.launch_control_lane.value, True)
+            self.fnLaunch(self.Launcher.launch_control_moving.value, False)
+
+        # traffic_light
+        elif self.current_mode == self.CurrentMode.traffic_light.value:
+            rospy.loginfo("New trigger for traffic_light")
+            self.fnLaunch(self.Launcher.launch_detect_lane.value, True)
+            self.fnLaunch(self.Launcher.launch_detect_sign.value, False)
+            self.fnLaunch(self.Launcher.launch_detect_level.value, False)
+            self.fnLaunch(self.Launcher.launch_detect_construction.value, False)
+            self.fnLaunch(self.Launcher.launch_detect_traffic_light.value, True)
+            
+            self.fnLaunch(self.Launcher.launch_control_intersection.value, False)
+            self.fnLaunch(self.Launcher.launch_control_lane.value, False)
+            self.fnLaunch(self.Launcher.launch_control_moving.value, False)
+     
+        # level_crossing
+        elif self.current_mode == self.CurrentMode.level_crossing.value:
+            rospy.loginfo("New trigger for level_crossing")
+            msg_pub_level_crossing_order = UInt8()
+
+            if self.current_step_level_crossing == self.StepOfLevelCrossing.searching_stop_sign.value:
+                rospy.loginfo("Current step : searching_stop_sign")
+                rospy.loginfo("Go to next step : searching_level")
+                msg_pub_level_crossing_order.data = self.StepOfLevelCrossing.searching_level.value
+
+                self.fnLaunch(self.Launcher.launch_detect_sign.value, False)
+                self.fnLaunch(self.Launcher.launch_detect_lane.value, True)
+                self.fnLaunch(self.Launcher.launch_detect_level.value, True)
+                self.fnLaunch(self.Launcher.launch_detect_traffic_light.value, False)
+                self.fnLaunch(self.Launcher.launch_detect_construction.value, False)
+                
+                self.fnLaunch(self.Launcher.launch_control_intersection.value, False)                
+                self.fnLaunch(self.Launcher.launch_control_lane.value, True)
+                self.fnLaunch(self.Launcher.launch_control_moving.value, False)
+
+                                   
+            elif self.current_step_level_crossing == self.StepOfLevelCrossing.searching_level.value:
+                rospy.loginfo("Current step : searching_level")
+                rospy.loginfo("Go to next step : watching_level")
+
+                msg_pub_level_crossing_order.data = self.StepOfLevelCrossing.watching_level.value
+
+            
+                self.fnLaunch(self.Launcher.launch_detect_sign.value, False)
+                self.fnLaunch(self.Launcher.launch_detect_lane.value, True)
+                self.fnLaunch(self.Launcher.launch_detect_level.value, True)
+                self.fnLaunch(self.Launcher.launch_detect_traffic_light.value, False)
+                self.fnLaunch(self.Launcher.launch_detect_construction.value, False)
+                
+                self.fnLaunch(self.Launcher.launch_control_intersection.value, False)   
+
+                self.fnLaunch(self.Launcher.launch_control_lane.value, True)
+                self.fnLaunch(self.Launcher.launch_control_moving.value, False)
+
+            elif self.current_step_level_crossing == self.StepOfLevelCrossing.watching_level.value:
+                rospy.loginfo("Current step : watching_level")
+                rospy.loginfo("Go to next step : stop")
+
+                msg_pub_level_crossing_order.data = self.StepOfLevelCrossing.stop.value
+
+        
+                self.fnLaunch(self.Launcher.launch_detect_sign.value, False)
+                self.fnLaunch(self.Launcher.launch_detect_lane.value, True)
+                self.fnLaunch(self.Launcher.launch_detect_level.value, True)
+                self.fnLaunch(self.Launcher.launch_detect_traffic_light.value, False)
+                self.fnLaunch(self.Launcher.launch_detect_construction.value, False)
+                
+                self.fnLaunch(self.Launcher.launch_control_intersection.value, False)  
+
+                self.fnLaunch(self.Launcher.launch_control_lane.value, False)
+                self.fnLaunch(self.Launcher.launch_control_moving.value, False)
+
+            elif self.current_step_level_crossing == self.StepOfLevelCrossing.stop.value:
+                rospy.loginfo("Current step : stop")
+                rospy.loginfo("Go to next step : pass_level")
+
+                msg_pub_level_crossing_order.data = self.StepOfLevelCrossing.pass_level.value
+
+                self.fnLaunch(self.Launcher.launch_detect_sign.value, False)
+                self.fnLaunch(self.Launcher.launch_detect_lane.value, True)
+                self.fnLaunch(self.Launcher.launch_detect_level.value, True)
+                self.fnLaunch(self.Launcher.launch_detect_traffic_light.value, False)
+                self.fnLaunch(self.Launcher.launch_detect_construction.value, False)
+                
+                self.fnLaunch(self.Launcher.launch_control_intersection.value, False)  
+
+                self.fnLaunch(self.Launcher.launch_control_lane.value, False)
+                self.fnLaunch(self.Launcher.launch_control_moving.value, False)
+
+            elif self.current_step_level_crossing == self.StepOfLevelCrossing.pass_level.value:
+                rospy.loginfo("Current step : pass_level")
+                rospy.loginfo("Go to next step : searching_stop_sign")
+
+                msg_pub_level_crossing_order.data = self.StepOfLevelCrossing.searching_stop_sign.value
+
+                self.fnLaunch(self.Launcher.launch_detect_sign.value, True)
+                self.fnLaunch(self.Launcher.launch_detect_lane.value, True)
+                self.fnLaunch(self.Launcher.launch_detect_level.value, True)
+                self.fnLaunch(self.Launcher.launch_detect_traffic_light.value, False)
+                self.fnLaunch(self.Launcher.launch_detect_construction.value, False)
+                
+                self.fnLaunch(self.Launcher.launch_control_intersection.value, False)  
+                
+                self.fnLaunch(self.Launcher.launch_control_lane.value, True)
+                self.fnLaunch(self.Launcher.launch_control_moving.value, False)
+
+            rospy.sleep(2)
+
+            self.pub_level_crossing_order.publish(msg_pub_level_crossing_order)
+
+        # intersection
+        elif self.current_mode == self.CurrentMode.intersection.value:
+            # rospy.loginfo("New trigger for intersection")
+            msg_pub_intersection_order = UInt8()
+
+            if self.current_step_intersection == self.StepOfIntersection.detect_intersection_sign.value:
+                rospy.loginfo("Current step : searching_intersection_sign")
+                rospy.loginfo("Go to next step : exit")
+
+                msg_pub_intersection_order.data = self.StepOfIntersection.detect_intersection_sign.value
+
+                self.fnLaunch(self.Launcher.launch_detect_lane.value, True)
+                self.fnLaunch(self.Launcher.launch_detect_sign.value, True)
+                self.fnLaunch(self.Launcher.launch_detect_level.value, False)
+                self.fnLaunch(self.Launcher.launch_detect_traffic_light.value, False)
+                self.fnLaunch(self.Launcher.launch_detect_construction.value, False)
+                
+                self.fnLaunch(self.Launcher.launch_control_intersection.value, True)
+                self.fnLaunch(self.Launcher.launch_control_lane.value, True)
+                self.fnLaunch(self.Launcher.launch_control_moving.value, True)
+              
+            elif self.current_step_intersection == self.StepOfIntersection.exit.value:
+                rospy.loginfo("Current step : exit")
+
+                msg_pub_intersection_order.data = self.StepOfIntersection.exit.value
+                self.fnLaunch(self.Launcher.launch_control_moving.value, False)
+
+                self.fnLaunch(self.Launcher.launch_detect_lane.value, True)
+                self.fnLaunch(self.Launcher.launch_detect_sign.value, True)
+                self.fnLaunch(self.Launcher.launch_detect_level.value, False)
+                self.fnLaunch(self.Launcher.launch_detect_traffic_light.value, False)
+                self.fnLaunch(self.Launcher.launch_detect_construction.value, False)
+
+                self.fnLaunch(self.Launcher.launch_control_intersection.value, False)
+               
+                self.fnLaunch(self.Launcher.launch_control_lane.value, True)
+
+            rospy.sleep(3)
+
+            self.pub_intersection_order.publish(msg_pub_intersection_order)
+
+        # construction
+        elif self.current_mode == self.CurrentMode.construction.value:
+            rospy.loginfo("New trigger for construction")
+            msg_pub_construction_order = UInt8()
+
+            if self.current_step_construction == self.StepOfConstruction.searching_construction_sign.value:
+                rospy.loginfo("Current step : searching construction sign")
+                rospy.loginfo("Go to next setp : find_obstacle")
+
+                msg_pub_construction_order.data = self.StepOfConstruction.find_obstacle.value
+
+                self.fnLaunch(self.Launcher.launch_detect_lane.value, True)
+                self.fnLaunch(self.Launcher.launch_detect_sign.value, False)
+                self.fnLaunch(self.Launcher.launch_detect_level.value, False)
+                self.fnLaunch(self.Launcher.launch_detect_traffic_light.value, False)
+                self.fnLaunch(self.Launcher.launch_detect_construction.value, True)
+
+                self.fnLaunch(self.Launcher.launch_control_intersection.value, False)
+                self.fnLaunch(self.Launcher.launch_control_lane.value, True)
+                self.fnLaunch(self.Launcher.launch_control_moving.value, False)
+
+            elif self.current_step_construction == self.StepOfConstruction.find_obstacle.value:
+                rospy.loginfo("Current step : find_obstacle")
+                rospy.loginfo("Go to next setp : motion_lf")
+
+                msg_pub_construction_order.data = self.StepOfConstruction.motion_lf.value
+
+                self.fnLaunch(self.Launcher.launch_detect_lane.value, True)
+                self.fnLaunch(self.Launcher.launch_detect_sign.value, False)
+                self.fnLaunch(self.Launcher.launch_detect_level.value, False)
+                self.fnLaunch(self.Launcher.launch_detect_traffic_light.value, False)
+                self.fnLaunch(self.Launcher.launch_detect_construction.value, True)
+                
+                self.fnLaunch(self.Launcher.launch_control_intersection.value, False)
+                self.fnLaunch(self.Launcher.launch_control_lane.value, False)
+                self.fnLaunch(self.Launcher.launch_control_moving.value, True)
+
+            elif self.current_step_construction == self.StepOfConstruction.motion_lf.value:
+                rospy.loginfo("Current step : motion_lf")
+                rospy.loginfo("Current step : exit")
+                
+                msg_pub_construction_order.data = self.StepOfConstruction.exit.value
+
+                self.fnLaunch(self.Launcher.launch_detect_lane.value, True)
+                self.fnLaunch(self.Launcher.launch_detect_sign.value, False)
+                self.fnLaunch(self.Launcher.launch_detect_level.value, False)
+                self.fnLaunch(self.Launcher.launch_detect_traffic_light.value, False)
+                self.fnLaunch(self.Launcher.launch_detect_construction.value, False)
+
+                self.fnLaunch(self.Launcher.launch_control_intersection.value, False)
+                self.fnLaunch(self.Launcher.launch_control_lane.value, True)
+                self.fnLaunch(self.Launcher.launch_control_moving.value, True)
+
+            elif self.current_step_construction == self.StepOfConstruction.exit.value:
+                rospy.loginfo("Current step : exit")
+                rospy.loginfo("Go to next step : searching construction sign")
+
+                msg_pub_construction_order.data = self.StepOfConstruction.searching_construction_sign.value
+
+                self.fnLaunch(self.Launcher.launch_detect_lane.value, True)
+                self.fnLaunch(self.Launcher.launch_detect_sign.value, True)
+                self.fnLaunch(self.Launcher.launch_detect_level.value, False)
+                self.fnLaunch(self.Launcher.launch_detect_traffic_light.value, False)
+                self.fnLaunch(self.Launcher.launch_detect_construction.value, False)
+
+                self.fnLaunch(self.Launcher.launch_control_intersection.value, False)
+                self.fnLaunch(self.Launcher.launch_control_lane.value, True)
+                self.fnLaunch(self.Launcher.launch_control_moving.value, False)
+                
+            rospy.sleep(2)
+            self.pub_construction_order.publish(msg_pub_construction_order)
+
+
+    def fnLaunch(self, launch_num, is_start):
+        if launch_num == self.Launcher.launch_detect_sign.value:
+            if is_start == True:
+                if self.launch_detect_sign_launched == False:
+                    self.launch_detect_sign = roslaunch.scriptapi.ROSLaunch()
+                    self.launch_detect_sign = roslaunch.parent.ROSLaunchParent(self.uuid, [self.ros_package_path + "aicon_camp1_detect/launch/detect_sign.launch"])
+                    self.launch_detect_sign_launched = True
+                    self.launch_detect_sign.start()
+                else:
+                    pass
+            else:
+                if self.launch_detect_sign_launched == True:
+                    self.launch_detect_sign_launched = False
+                    self.launch_detect_sign.shutdown()
+                else:
+                    pass
+
+        elif launch_num == self.Launcher.launch_detect_lane.value:
+            if is_start == True:
+                if self.launch_detect_lane_launched == False:
+                    self.launch_detect_lane = roslaunch.scriptapi.ROSLaunch()
+                    self.launch_detect_lane = roslaunch.parent.ROSLaunchParent(self.uuid, [self.ros_package_path + "aicon_camp1_detect/launch/detect_lane.launch"])
+                    self.launch_detect_lane_launched = True
+                    self.launch_detect_lane.start()
+                else:
+                    pass
+            else:
+                if self.launch_detect_lane_launched == True:
+                    self.launch_detect_lane_launched = False
+                    self.launch_detect_lane.shutdown()
+                else:
+                    pass
+            
+        elif launch_num == self.Launcher.launch_detect_traffic_light.value:
+            if is_start == True:
+                if self.launch_detect_traffic_light_launched == False:
+                    self.launch_detect_traffic_light = roslaunch.scriptapi.ROSLaunch()
+                    self.launch_detect_traffic_light = roslaunch.parent.ROSLaunchParent(self.uuid, [self.ros_package_path + "aicon_camp1_detect/launch/detect_traffic_light.launch"])     
+                    self.launch_detect_traffic_light_launched = True
+                    self.launch_detect_traffic_light.start()
+                else:
+                    pass
+            else:
+                if self.launch_detect_traffic_light_launched == True:
+                    self.launch_detect_traffic_light_launched = False
+                    self.launch_detect_traffic_light.shutdown()
+                else:
+                    pass   
+
+        elif launch_num == self.Launcher.launch_control_lane.value:
+            if is_start == True:
+                if self.launch_control_lane_launched == False:
+                    self.launch_control_lane = roslaunch.scriptapi.ROSLaunch()
+                    self.launch_control_lane = roslaunch.parent.ROSLaunchParent(self.uuid, [self.ros_package_path + "aicon_camp1_control/launch/control_lane.launch"])
+                    self.launch_control_lane_launched = True
+                    self.launch_control_lane.start()
+                else:
+                    pass
+            else:
+                if self.launch_control_lane_launched == True:
+                    self.launch_control_lane_launched = False
+                    self.launch_control_lane.shutdown()
+                else:
+                    pass
+                                
+        elif launch_num == self.Launcher.launch_detect_level.value:
+            if is_start == True:
+                if self.launch_detect_level_launched == False:
+                    self.launch_detect_level = roslaunch.scriptapi.ROSLaunch()
+                    self.launch_detect_level = roslaunch.parent.ROSLaunchParent(self.uuid, [self.ros_package_path + "aicon_camp1_detect/launch/detect_level.launch"])     
+                    self.launch_detect_level_launched = True
+                    self.launch_detect_level.start()
+                else:
+                    pass
+            else:
+                if self.launch_detect_level_launched == True:
+                    self.launch_detect_level_launched = False
+                    self.launch_detect_level.shutdown()
+                else:
+                    pass
+
+        elif launch_num == self.Launcher.launch_control_intersection.value:
+            if is_start == True:
+                if self.launch_control_intersection_launched == False:
+                    self.launch_control_intersection = roslaunch.scriptapi.ROSLaunch()
+                    self.launch_control_intersection = roslaunch.parent.ROSLaunchParent(self.uuid, [self.ros_package_path + "aicon_camp1_control/launch/control_intersection.launch"])
+                    self.launch_control_intersection_launched = True
+                    self.launch_control_intersection.start()
+                else:
+                    pass
+            else:
+                if self.launch_control_intersection_launched == True:
+                    self.launch_control_intersection_launched = False
+                    self.launch_control_intersection.shutdown()
+                pass
+        
+        elif launch_num == self.Launcher.launch_detect_construction.value:
+            if is_start == True:
+                if self.launch_detect_construction_launched == False:
+                    self.launch_detect_construction = roslaunch.scriptapi.ROSLaunch()
+                    self.launch_detect_construction = roslaunch.parent.ROSLaunchParent(self.uuid, [self.ros_package_path + "aicon_camp1_detect/launch/detect_construction.launch"])
+                    self.launch_detect_construction_launched = True
+                    self.launch_detect_construction.start()
+                else:
+                    pass
+            else:
+                if self.launch_detect_construction_launched == True:
+                    self.launch_detect_construction_launched = False
+                    self.launch_detect_construction.shutdown()
+                pass
+        elif launch_num == self.Launcher.launch_control_moving.value:
+            if is_start == True:
+                if self.launch_control_moving_launched == False:
+                    self.launch_control_moving = roslaunch.scriptapi.ROSLaunch()
+                    self.launch_control_moving = roslaunch.parent.ROSLaunchParent(self.uuid, [self.ros_package_path + "aicon_camp1_control/launch/control_moving.launch"])
+                    self.launch_control_moving_launched = True
+                    self.launch_control_moving.start()
+                else:
+                    pass
+            else:
+                if self.launch_control_moving_launched == True:
+                    self.launch_control_moving_launched = False
+                    self.launch_control_moving.shutdown()
+                pass
+
+    def main(self):
+        rospy.spin()
+
+if __name__ == '__main__':
+    rospy.init_node('core_node_controller')
+    node = CoreNodeController()
+    node.main()

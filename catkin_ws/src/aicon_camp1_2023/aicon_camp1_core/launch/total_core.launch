@@ -1,0 +1,5 @@
+<launch>
+    <!-- image brightness & contrast compensation of ground-projected image -->
+    <node pkg="aicon_camp1_core" type="total_node_controller" name="total_node_controller" output="screen" />
+    <node pkg="aicon_camp1_core" type="total_mode_decider" name="total_mode_decider" output="screen" />
+</launch>

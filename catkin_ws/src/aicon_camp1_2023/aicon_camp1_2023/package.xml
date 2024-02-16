@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>aicon_camp1_2023</name>
+  <version>1.0.0</version>
+  <description>
+    Aicontrol CAMP1 2023 ROS 1 packages (meta package)
+  </description>
+  <license>Apache 2.0</license>
+  <maintainer email="yjchoi@aicontrol.ai">Yejin Choi</maintainer>
+  <url type="website">http://aicontrol.ai</url>
+  <buildtool_depend>catkin</buildtool_depend>
+  <exec_depend>aicon_camp1_camera</exec_depend>
+  <exec_depend>aicon_camp1_control</exec_depend>
+  <exec_depend>aicon_camp1_core</exec_depend>
+  <exec_depend>aicon_camp1_detect</exec_depend>
+  <exec_depend>aicon_camp1_msgs</exec_depend>
+  <export><metapackage/></export>
+</package>

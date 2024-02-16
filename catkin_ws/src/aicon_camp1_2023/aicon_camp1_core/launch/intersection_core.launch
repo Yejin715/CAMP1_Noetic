@@ -1,0 +1,5 @@
+<launch>
+    <!-- image brightness & contrast compensation of ground-projected image -->
+    <node pkg="aicon_camp1_core" type="intersection_node_controller" name="intersection_node_controller" output="screen" />
+    <node pkg="aicon_camp1_core" type="intersection_mode_decider" name="intersection_mode_decider" output="screen" />
+</launch>

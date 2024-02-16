@@ -1,0 +1,6 @@
+<launch>
+  <!-- lane control -->
+  <node pkg="aicon_camp1_control" type="control_lane" name="control_lane" output="screen">
+  </node>
+</launch>
+ 

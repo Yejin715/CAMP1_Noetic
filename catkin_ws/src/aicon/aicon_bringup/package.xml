@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>aicon_bringup</name>
+  <version>1.0.0</version>
+  <description>
+    roslaunch scripts for starting the Aicontrol CAMP-1
+  </description>
+  <license>Apache 2.0</license>
+  <maintainer email="yjchoi@aicontrol.ai">Yejin Choi</maintainer>
+  <url type="website">http://aicontrol.ai</url>
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>roscpp</depend>
+  <depend>std_msgs</depend>
+  <depend>diagnostic_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>aicon_msgs</depend>
+  <exec_depend>aicon_description</exec_depend>
+  <exec_depend>aicon_teleop</exec_depend>
+  <exec_depend>joint_state_publisher</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>rosserial_python</exec_depend>
+  <exec_depend>hls_lfcd_lds_driver</exec_depend>
+</package>

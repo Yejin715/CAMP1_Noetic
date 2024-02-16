@@ -1,0 +1,5 @@
+<launch>
+  <!-- lane control -->
+  <node pkg="aicon_camp1_control" type="control_intersection" name="control_intersection" output="screen">
+  </node>
+</launch>
